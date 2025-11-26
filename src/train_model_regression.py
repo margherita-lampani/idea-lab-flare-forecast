@@ -131,6 +131,8 @@ def main():
     print("DEBUG: Checking data BEFORE training")
     print("="*60)
 
+    print("from my laptop")
+
     # --- Setup data
     data.prepare_data()
     data.setup('fit')
