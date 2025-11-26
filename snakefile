@@ -13,7 +13,7 @@ rule all:
         # "{sd}/labels_all_smoothed.csv".format(sd=config['save_dir']),
         config['data']['data_file']
     shell:
-        "python src/train_models.py"
+        "python src/train_models_regression.py"
 
 rule download:
     output:

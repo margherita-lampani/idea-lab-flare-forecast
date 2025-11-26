@@ -9,10 +9,10 @@ import pandas as pd
 import pytorch_lightning as pl
 import random
 from torch.utils.data import Dataset,DataLoader
-from sklearn.preprocessing import MaxAbsScaler,StandardScaler
+from sklearn.preprocessing import MaxAbsScaler,StandardScaler, RobustScaler
 from src.utils.transforms import RandomPolaritySwitch
 from datetime import datetime,timedelta
-
+'''
 def split_data(df,val_split,test=''):
     """
         Split dataset into training, validation, hold-out (pseudotest) and test sets.
@@ -32,6 +32,27 @@ def split_data(df,val_split,test=''):
             df_train (dataframe):       Training set
             df_val (dataframe):         Validation set
     """
+
+    """
+    Split dataset - modified for small datasets
+    """
+    # Check if dataset is too small
+    if len(df) < 365:
+        print(f"WARNING: Dataset very small ({len(df)} samples). Using simple split.")
+        # Simple temporal split for small datasets
+        n = len(df)
+        n_test = max(1, int(n * 0.2))
+        n_pseudo = max(1, int(n * 0.1))
+        n_val = max(1, int((n - n_test - n_pseudo) * 0.2))
+        
+        df = df.sort_values('sample_time').reset_index(drop=True)
+        df_test = df.iloc[-n_test:]
+        df_pseudotest = df.iloc[-(n_test+n_pseudo):-n_test]
+        df_remaining = df.iloc[:-(n_test+n_pseudo)]
+        df_val = df_remaining.iloc[-n_val:]
+        df_train = df_remaining.iloc[:-n_val]
+        
+        return df_test, df_pseudotest, df_train, df_val
 
     # hold out test sets
     inds_test_a = (df['sample_time'].dt.month >= 11)
@@ -66,6 +87,22 @@ def split_data(df,val_split,test=''):
     df_train = df_train.drop(df_val.index)
 
     return df_test,df_pseudotest,df_train,df_val
+'''
+
+"""
+Split dataset - modified for overfitting test mode
+"""
+def split_data(df, val_split, test=''):
+    print("WARNING: Overfitting test mode - using same data for train/val/test")
+    
+    df_small = df.copy() #df.head(128).copy()
+    
+    df_test = df_small
+    df_pseudotest = df_small
+    df_train = df_small
+    df_val = df_small
+    
+    return df_test, df_pseudotest, df_train, df_val
 
 class MagnetogramDataSet(Dataset):
     """
@@ -86,8 +123,9 @@ class MagnetogramDataSet(Dataset):
         self.label_frame = df.loc[:,label]
         self.dataset_frame = df.loc[:,'dataset']
         self.transform = transform
-        self.features = df.loc[:,feature_cols]
+        self.features = df.loc[:,feature_cols].copy() #self.features = df.loc[:,feature_cols]
         self.maxval = maxval
+        self.df = df #ADDED
 
     def __len__(self):
         return len(self.name_frame)
@@ -119,13 +157,15 @@ class MagnetogramDataSet(Dataset):
             img = img/self.maxval
 
         label = self.label_frame.iloc[idx]
-        features = torch.Tensor(self.features.iloc[idx])
+        #features = torch.Tensor(self.features.iloc[idx]) (MODIFIED)
+        features = torch.tensor(self.features.iloc[idx].to_numpy(), dtype=torch.float32)
+
 
         # transform image
         img = self.transform(img)
 
         return [filename,img,features,label]
-    
+
 
 class MagnetogramDataModule(pl.LightningDataModule):
     """
@@ -229,9 +269,18 @@ class MagnetogramDataModule(pl.LightningDataModule):
             df_train = df_train.iloc[inds_train,:]
 
         # scale input features
+
         if len(self.feature_cols)>0:
             self.scaler = StandardScaler()
             self.scaler.fit(df_train.loc[:,self.feature_cols])
+
+            #ADDED
+            df_train = df_train.copy()
+            df_val = df_val.copy()
+            df_pseudotest = df_pseudotest.copy()
+            df_test = df_test.copy()
+            #####################
+
             df_train.loc[:,self.feature_cols] = self.scaler.transform(df_train.loc[:,self.feature_cols])
             df_val.loc[:,self.feature_cols] = self.scaler.transform(df_val.loc[:,self.feature_cols])
             df_pseudotest.loc[:,self.feature_cols] = self.scaler.transform(df_pseudotest.loc[:,self.feature_cols])
@@ -242,6 +291,7 @@ class MagnetogramDataModule(pl.LightningDataModule):
         self.trainval_set = MagnetogramDataSet(pd.concat([df_train,df_val]),self.label,self.transform,self.feature_cols)
         self.pseudotest_set = MagnetogramDataSet(df_pseudotest,self.label,self.transform,self.feature_cols)
         self.test_set = MagnetogramDataSet(df_test,self.label,self.transform,self.feature_cols)
+
         print('Train:',len(self.train_set),
               'Valid:',len(self.val_set),
               'Pseudo-test:',len(self.pseudotest_set),
@@ -270,6 +320,3 @@ class MagnetogramDataModule(pl.LightningDataModule):
 
     def predict_dataloader(self):
         return DataLoader(self.test_set,batch_size=self.batch_size,num_workers=4)
-
-
-

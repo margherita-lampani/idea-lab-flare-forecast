@@ -32,6 +32,7 @@ def load_model(run,ckpt_path,model,litclass=LitConvNet,strict=True,download:bool
     classifier = litclass.load_from_checkpoint(Path(artifact_dir)/'model.ckpt',model=model,strict=strict)
     return classifier
 
+
 def save_preds(preds,dir,fname,regression:bool=False):
     """
     Saves model predictions locally and to wandb run
