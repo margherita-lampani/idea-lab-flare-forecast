@@ -16,7 +16,7 @@ import yaml
 root = sys.argv[1]
 
 # Read config and extract start and end year
-with open('experiment_config.yml') as f:
+with open('snakemake_config.yaml') as f:
     config = yaml.safe_load(f)
 
 start_date = datetime.strptime(config['start_date'], '%Y-%m-%d')
