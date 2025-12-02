@@ -3,7 +3,7 @@ data:
   balance_ratio: 0
   channels:
   - 0
-  data_file: Data/labels_regression_24h.csv
+  data_file: ../Data/labels_regression_24h.csv
   dim: 128
   feature_cols:
   - tot_us_flux
@@ -24,7 +24,7 @@ data:
   maxval:
   - 500
   regression: true
-  test: '' #try test_a 
+  test: 'test_b' #try test_a 
   use_zarr_dataset: false
   val_split: 0
   zarr_file: null
@@ -40,10 +40,10 @@ model:
 testing:
   eval: true
   savedir: results
-  savefile: 24h_historical_testa_regression
+  savefile: 24h_historical_testb_regression
 training:
-  batch_size: 64
-  device: cpu
+  batch_size: 256
+  device: gpu
   devices: 1
   epochs: 100
   lr: 0.0001 

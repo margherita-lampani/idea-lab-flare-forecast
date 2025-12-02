@@ -12,7 +12,7 @@ from torch.utils.data import Dataset,DataLoader
 from sklearn.preprocessing import MaxAbsScaler,StandardScaler, RobustScaler
 from src.utils.transforms import RandomPolaritySwitch
 from datetime import datetime,timedelta
-'''
+
 def split_data(df,val_split,test=''):
     """
         Split dataset into training, validation, hold-out (pseudotest) and test sets.
@@ -87,8 +87,8 @@ def split_data(df,val_split,test=''):
     df_train = df_train.drop(df_val.index)
 
     return df_test,df_pseudotest,df_train,df_val
-'''
 
+'''
 """
 Split dataset - modified for overfitting test mode
 """
@@ -103,6 +103,7 @@ def split_data(df, val_split, test=''):
     df_val = df_small
     
     return df_test, df_pseudotest, df_train, df_val
+'''
 
 class MagnetogramDataSet(Dataset):
     """
