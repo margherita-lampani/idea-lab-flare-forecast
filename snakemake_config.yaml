@@ -1,7 +1,7 @@
 # set up download parameters
-email: 'kiera.vds@gmail.com'
-start_date: '2010-01-01'
-end_date: '2010-12-31'
+email: 'margherita.lampani@edu.unige.it'
+start_date: '1996-01-01' 
+end_date: '2023-01-01' 
 wavelength: 171
 instrument_download: ['HMI','MDI']
 instrument_process: ['HMI','MDI'] 
@@ -10,9 +10,7 @@ cadence: '1d'      # desired cadence (much less than 1 day may require
 format: 'fits'
 dlim: 1000
 newdir: 'Data/hdf5_smoothed'
-nworkers: 8
+nworkers: 4 #8 original
 
 # set up labeling parameters
 forecast_windows: '12 24 48' #'24''48'
-
-

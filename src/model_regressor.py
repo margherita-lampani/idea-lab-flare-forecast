@@ -214,6 +214,13 @@ class LitConvNetRegressor(pl.LightningModule):
     def __init__(self,model,lr:float=1e-4,wd:float=1e-2,epochs:int=100):
         super().__init__()
         self.model = model
+
+        # Save original values before wandb modifies them (ADDED)
+        self._lr_value = lr
+        self._wd_value = wd
+        self._epochs_value = epochs
+
+        #original 
         self.lr = lr
         self.weight_decay = wd
         self.epochs = epochs
@@ -305,8 +312,10 @@ class LitConvNetRegressor(pl.LightningModule):
             Returns:
                 optimizer:              A torch optimizer
         """
-        optimizer = optim.Adam(self.model.parameters(),lr=self.lr,weight_decay=self.weight_decay)
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=self.epochs)
+        #optimizer = optim.Adam(self.model.parameters(), lr=float(self.lr), weight_decay=self.weight_decay)
+        optimizer = optim.Adam(self.model.parameters(), lr=self._lr_value, weight_decay=self._wd_value)
+        #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=self.epochs)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self._epochs_value)
         return [optimizer],[scheduler]
 
     def predict_step(self,batch,batch_idx,dataloader_idx=0):

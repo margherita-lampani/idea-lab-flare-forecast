@@ -42,8 +42,21 @@ class MLPModel():
         self.scaler.fit(self.df_train[self.features])
         self.X_train = self.scaler.transform(self.df_train[self.features])
         self.X_val = self.scaler.transform(self.df_val[self.features])
-        self.X_pseudotest = self.scaler.transform(self.df_pseudotest[self.features])
-        self.X_test = self.scaler.transform(self.df_test[self.features])
+        # ADDED LINES (see github for original version)
+        if len(self.df_pseudotest) == 0:
+            self.X_pseudotest = None
+            self.y_pseudotest = None
+        else:
+            self.X_pseudotest = self.scaler.transform(self.df_pseudotest[self.features])
+            self.y_pseudotest = self.df_pseudotest[self.label].values
+
+        if len(self.df_test) == 0:
+            self.X_test = None
+            self.y_test = None
+        else:
+            self.X_test = self.scaler.transform(self.df_test[self.features])
+            self.y_test = self.df_test[self.label].values 
+
         return
 
     def train(self):

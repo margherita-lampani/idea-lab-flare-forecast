@@ -1,6 +1,9 @@
 import sys,os
 sys.path.append(os.getcwd())
 
+#ADDED (disable wandb for testing on some systems)
+os.environ["WANDB_MODE"] = "disabled"
+
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelSummary, ModelCheckpoint 
@@ -88,14 +91,15 @@ def main():
                                  weights=weights,dropoutRatio=config.model['dropout_ratio'])
     classifier = LitConvNetRegressor(model,config.training['lr'],config.training['wd'],epochs=config.training['epochs'])
 
-    # load checkpoint
+    # load checkpoint (MODIFIED for original see github)
+    '''
     if wandb.run.resumed:
         classifier = load_model(run, config.meta['user']+'/'+config.meta['project']+'/model-'+config.meta['id']+':latest',
                                 model, litclass=LitConvNetRegressor)
     elif config.model['load_checkpoint']:
         classifier = load_model(run, config.model['checkpoint_location'], model, 
                                 litclass=LitConvNetRegressor, strict=False)
-
+    '''
 
     # initialize wandb logger
     wandb_logger = WandbLogger(log_model='all')
@@ -105,18 +109,132 @@ def main():
                                           save_last=True,
                                           save_weights_only=True,
                                           verbose=False)
-    early_stop_callback = EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=15,mode='min',strict=False,check_finite=False)
+    #early_stop_callback = EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=15,mode='min',strict=False,check_finite=False)
 
     # train model
     trainer = pl.Trainer(accelerator=config.training['device'],
-                         devices=[0],
+                         #devices=[0],
+                         devices=config.training.get('devices', 1), #ADDED
                          deterministic=False,
                          max_epochs=config.training['epochs'],
-                         callbacks=[ModelSummary(max_depth=2),early_stop_callback,checkpoint_callback],
-                         logger=wandb_logger,
+                         callbacks=[ModelSummary(max_depth=2),checkpoint_callback], #early_stop_callback],
+                         #gradient_clip_val=1.0, #ADDED
+                         #logger=wandb_logger,
+                         logger = None,
+                         enable_progress_bar=True, #ADDED
                          precision=16)
-    trainer.fit(model=classifier,datamodule=data)
+    
+    # ============================================================
+    # DEBUG 
+    # ============================================================
+    print("\n" + "="*60)
+    print("DEBUG: Checking data BEFORE training")
+    print("="*60)
 
+    print("from my laptop")
+
+    # --- Setup data
+    data.prepare_data()
+    data.setup('fit')
+
+    # ============================================================
+    # 1) NORMALIZED LABELS CHECK
+    # ============================================================
+    print("\n--- NORMALIZED LABELS CHECK ---")
+    if hasattr(data, "train_set") and hasattr(data.train_set, "df"):
+        df = data.train_set.df
+        print("Found train_set.df")
+        print(df['flare'].describe())
+        print("Any NaN:", df['flare'].isna().any())
+    else:
+        print("WARNING: train_set.df not accessible — dataset does not store raw dataframe")
+
+
+    # ============================================================
+    # 2) TRAINING BATCH CHECK
+    # ============================================================
+    print("\n--- TRAINING BATCH CHECK ---")
+
+    def summarize_tensor(name, t):
+        """Summarize a tensor's properties."""
+        print(f"\n{name}:")
+        print(f"  Shape: {tuple(t.shape)}")
+        print(f"  Dtype: {t.dtype}")
+        try:
+            print(f"  Min/Max: {t.min().item():.6f} / {t.max().item():.6f}")
+            print(f"  Mean/Std: {t.mean().item():.6f} / {t.std().item():.6f}")
+        except:
+            print("  Could not compute stats (maybe empty?)")
+        print(f"  Any NaN? {torch.isnan(t).any().item()}")
+        print(f"  Any Inf? {torch.isinf(t).any().item()}")
+
+    try:
+        train_loader = data.train_dataloader()
+        batch = next(iter(train_loader))
+
+        print(f"\nBatch type: {type(batch)}")
+        if isinstance(batch, tuple):
+            print(f"Batch length: {len(batch)}")
+        else:
+            print("Batch is not a tuple — unexpected structure!")
+
+        # ------------------------------------------------------------
+        # Identify and summarize elements in the batch
+        # ------------------------------------------------------------
+        images = labels = features = None
+
+        for i, element in enumerate(batch):
+            print(f"\n--- Element {i} ---")
+            print(f"Type: {type(element)}")
+
+            # Case 1: tensor
+            if torch.is_tensor(element):
+                if element.ndim == 4:  # Batch di immagini (B, C, H, W)
+                    images = element
+                    summarize_tensor("Images", element)
+                elif element.ndim == 1:  # probabilmente labels
+                    labels = element
+                    summarize_tensor("Labels", element)
+                elif element.ndim == 2:  # features tabulari
+                    features = element
+                    summarize_tensor("Features", element)
+                else:
+                    print(f"Tensor of unexpected shape: {element.shape}")
+
+            # Case 2: numpy array
+            elif isinstance(element, np.ndarray):
+                print("Numpy array detected, converting to tensor")
+                t = torch.tensor(element)
+                summarize_tensor(f"Element {i} (numpy)", t)
+
+            # Case 3: nested tuple (multiple images)
+            elif isinstance(element, tuple):
+                print(f"Nested tuple (len={len(element)})")
+                for j, sub in enumerate(element):
+                    print(f"   sub-element {j}, type={type(sub)}")
+                    if torch.is_tensor(sub):
+                        summarize_tensor(f"Tuple[{i}][{j}]", sub)
+            
+            else:
+                print(f"Unrecognized element type: {type(element)}")
+
+    except Exception as e:
+        print(f"ERROR loading batch: {e}")
+        import traceback
+        traceback.print_exc()
+
+    print("\n" + "="*60)
+    print("END DEBUG - Starting training...")
+    print("="*60 + "\n")
+
+    # ============================================================
+    # END DEBUG 
+    # ============================================================
+
+    trainer.fit(model=classifier, datamodule=data)
+
+    #TEMPORARILY DISABLED
+    ''' 
     # test trained model
     if config.testing['eval']:
         # load best checkpoint
@@ -137,6 +255,8 @@ def main():
         save_preds(preds,wandb.run.dir,'test_results.csv',config.data['regression'])
 
     wandb.finish()
+    ''' 
+    pass #ADDED
 
 if __name__ == "__main__":
     main()

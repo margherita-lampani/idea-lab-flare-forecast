@@ -47,7 +47,8 @@ class Downloader:
         self.largeFileLimit = False
         self.downloadLimit = downloadLimit
 
-        self.client = drms.Client(email = self.email, verbose = True)
+        #self.client = drms.Client(email = self.email, verbose = True)
+        self.client = drms.Client(email = self.email)
 
         if not os.path.exists(self.path):
             os.mkdir(self.path)
@@ -155,7 +156,8 @@ class Downloader:
                 print('%d file(s) available for download.\n' % len(export_request.urls))
             print("     Running the download command...")
 
-            self.export = export_request.download(out_path, verbose=False)
+            #self.export = export_request.download(out_path, verbose=False)
+            self.export = export_request.download(out_path)
             print("          Download took: ", time.time() - t1, "seconds")
 
         return self.export

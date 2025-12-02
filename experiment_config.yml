@@ -1,9 +1,9 @@
 data:
-  augmentation: conservative
+  augmentation: none #conservative (conservative was the original one used)
   balance_ratio: 0
   channels:
   - 0
-  data_file: Data/labels_regression_cleanedandchecked.csv
+  data_file: ../Data/labels_regression_24h.csv
   dim: 128
   feature_cols:
   - tot_us_flux
@@ -24,26 +24,29 @@ data:
   maxval:
   - 500
   regression: true
-  test: 'test_a'
+  test: 'test_b' #try test_a 
   use_zarr_dataset: false
   val_split: 0
-  zarr_file: /d0/euv/aia/preprocessed/aia_hmi_stacks_2010_2023_1d_1k.zarr
-meta:
+  zarr_file: null
+meta: #used for wandb logging, useless right now...
   id: None
   project: flare-forecast-regression
   resume: false
-  user: kierav
+  user: margherita-lampani
 model:
-  checkpoint_location: None
+  checkpoint_location: null
   dropout_ratio: 0
   load_checkpoint: false
 testing:
   eval: true
   savedir: results
-  savefile: 24h_historical_testa_regression
+  savefile: 24h_historical_testb_regression
 training:
   batch_size: 256
   device: gpu
+  devices: 1
   epochs: 100
-  lr: 0.0001
-  wd: 0.001
+  lr: 0.0001 
+  wd: 0 #0.001 (put to 0 just for the overfitting test)
+
+  #remember to uncomment the early stopping in train_model_regression.py after the overfitting test

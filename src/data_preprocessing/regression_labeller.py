@@ -29,7 +29,8 @@ def fix_artifacts(goes_ts):
     size_filt = np.min([int(np.floor(12/dt)),12])
     origin_filt =int(np.floor((size_filt-1)/2))
 
-    goes_ts_new = np.log10(sp.ndimage.median_filter(goes_ts['xrsb'].copy(),size_filt,origin=origin_filt))
+    #goes_ts_new = np.log10(sp.ndimage.median_filter(goes_ts['xrsb'].copy(),size_filt,origin=origin_filt))
+    goes_ts_new = np.log10(sp.ndimage.median_filter(goes_ts['xrsb'].values, size=3))
     goes_ts_new[np.isnan(goes_ts_new)] = np.nanmin(goes_ts_new)
 
     mask = np.zeros(len(goes_ts_new))
