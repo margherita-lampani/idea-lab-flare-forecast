@@ -215,7 +215,7 @@ class LitConvNetRegressor(pl.LightningModule):
         super().__init__()
         self.model = model
 
-        # Save original values before wandb modifies them (ADDED)
+        # Save original values before wandb modifies them 
         self._lr_value = lr
         self._wd_value = wd
         self._epochs_value = epochs
@@ -229,11 +229,17 @@ class LitConvNetRegressor(pl.LightningModule):
         # self.loss = WeightedMSELoss()   
         self.loss = nn.MSELoss()
 
-        # define metrics
+        # define metrics fo training, validation and test phases
+        self.train_mse = torchmetrics.MeanSquaredError()
+        self.train_mae = torchmetrics.MeanAbsoluteError()
+        self.train_r2 = torchmetrics.R2Score()
+
         self.val_mse = torchmetrics.MeanSquaredError()
         self.val_mae = torchmetrics.MeanAbsoluteError()
         self.val_r2 = torchmetrics.R2Score()
+
         self.test_mse = torchmetrics.MeanSquaredError()
+
         self.test_confusion_matrix = torchmetrics.ConfusionMatrix(task='binary',num_classes=2)
 
     def training_step(self,batch,batch_idx):
@@ -253,7 +259,15 @@ class LitConvNetRegressor(pl.LightningModule):
         y_hat = self.model(x,f)
         loss = self.loss(y_hat,y.type_as(y_hat))
 
-        self.log_dict({'loss':loss},
+        # calculate metrics
+        self.train_mse(y_hat*6-8.5,y*6-8.5)
+        self.train_mae(y_hat*6-8.5,y*6-8.5)
+        self.train_r2(y_hat,y)
+
+        self.log_dict({'loss':loss,
+                       'train_mse':self.train_mse,
+                       'train_mae':self.train_mae,
+                       'train_r2':self.train_r2},
                        on_step=False,on_epoch=True)
         return loss
     
@@ -297,6 +311,7 @@ class LitConvNetRegressor(pl.LightningModule):
         y = y.view(y.shape[0])
         # forward pass
         y_hat = self.model(x,f)
+        y_hat = y_hat.squeeze(-1) 
 
         # calculate metrics
         self.test_mse(y_hat,y)
@@ -312,9 +327,7 @@ class LitConvNetRegressor(pl.LightningModule):
             Returns:
                 optimizer:              A torch optimizer
         """
-        #optimizer = optim.Adam(self.model.parameters(), lr=float(self.lr), weight_decay=self.weight_decay)
         optimizer = optim.Adam(self.model.parameters(), lr=self._lr_value, weight_decay=self._wd_value)
-        #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=self.epochs)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self._epochs_value)
         return [optimizer],[scheduler]
 
