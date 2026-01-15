@@ -108,7 +108,7 @@ def main():
                                           save_last=True,
                                           save_weights_only=True,
                                           verbose=False)
-    early_stop_callback = EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=20,mode='min',strict=False,check_finite=False) #patience=15
+    early_stop_callback = EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=15,mode='min',strict=False,check_finite=False) #patience=15
 
     # train model
     trainer = pl.Trainer(accelerator=config.training['device'],
@@ -234,6 +234,7 @@ def main():
 
     #TEMPORARILY DISABLED 
     # test trained model
+    '''
     if config.testing['eval']:
         # load best checkpoint
         classifier = load_model(run, config.meta['user']+'/'+config.meta['project']+'/model-'+run.id+':best_k', model,
@@ -253,7 +254,7 @@ def main():
         save_preds(preds,wandb.run.dir,'test_results.csv',config.data['regression'])
 
     wandb.finish()
-    
+    '''
     # ============================================================
     # TESTING no wandb
     # ============================================================
@@ -266,8 +267,15 @@ def main():
             fnames, y_true, y_pred = batch
 
             fnames = list(fnames)
-            y_true = y_true.detach().cpu().float().numpy().flatten().tolist()
-            y_pred = y_pred.detach().cpu().float().numpy().flatten().tolist()
+            y_true = y_true.detach().cpu().float().numpy().flatten()
+            y_pred = y_pred.detach().cpu().float().numpy().flatten()
+
+            y_true = y_true * 6 - 8.5
+            y_pred = y_pred * 6 - 8.5
+
+            y_true = y_true.tolist()
+            y_pred = y_pred.tolist()
+
 
             for f, yt, yp in zip(fnames, y_true, y_pred):
                 ae = abs(yt - yp)
@@ -350,11 +358,11 @@ def main():
         save_predictions_local(preds, results_dir, 'trainval_results.csv')
         
         # --------------------------
-        # Pseudotest predictions
+        # Pseudotest predictions     #COMMENT TO NOT SEE PSEUDOTEST
         # --------------------------
-        print('\n------Pseudotest predictions------')
-        preds = trainer.predict(model=classifier, dataloaders=data.pseudotest_dataloader())
-        save_predictions_local(preds, results_dir, 'pseudotest_results.csv')
+        #print('\n------Pseudotest predictions------')
+        #preds = trainer.predict(model=classifier, dataloaders=data.pseudotest_dataloader())
+        #save_predictions_local(preds, results_dir, 'pseudotest_results.csv')
         
         # --------------------------
         # Test predictions

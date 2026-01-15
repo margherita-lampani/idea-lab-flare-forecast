@@ -10,6 +10,7 @@ from src.data import split_data
 from datetime import datetime, timedelta
 import numpy as np
 import matplotlib.pyplot as plt
+import yaml
 
 class MLPModel():
     """
@@ -68,7 +69,11 @@ class MLPModel():
         
 
 if __name__ == "__main__":
-    data_file = 'Data/labels_regression_cleanedandchecked.csv'
+
+    with open('experiment_config.yml') as config_file:
+        config = yaml.safe_load(config_file.read())
+    
+    data_file = config['data_file']
     window = 24
     print('Window: ',window,'h')
 
