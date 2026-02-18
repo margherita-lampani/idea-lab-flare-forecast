@@ -270,38 +270,32 @@ def main():
             y_true = y_true.detach().cpu().float().numpy().flatten()
             y_pred = y_pred.detach().cpu().float().numpy().flatten()
 
-            y_true = y_true * 6 - 8.5
+            # partial denormalization, results written in terms of log10(flux), see prepare_data function in src/data.py line 246
+            y_true = y_true * 6 - 8.5 
             y_pred = y_pred * 6 - 8.5
 
-            y_true = y_true.tolist()
-            y_pred = y_pred.tolist()
-
-
-            for f, yt, yp in zip(fnames, y_true, y_pred):
-                ae = abs(yt - yp)
-                se = (yt - yp)**2
-                
-                row = {
-                    "file": f,
-                    "y_true": yt,
-                    "y_pred": yp,
-                    "AE": ae,
-                    "SE": se,
-                    "R2": None
-                }
-                rows.append(row)
+            batch_df = pd.DataFrame({
+                "file": list(fnames),
+                "y_true": y_true,
+                "y_pred": y_pred,
+                "abs_error": np.abs(y_true - y_pred),
+                "squared_error": (y_true - y_pred)**2,
+                "R2": None
+            })
+            
+            rows.append(batch_df)
         
-        df = pd.DataFrame(rows)
+        df = pd.concat(rows, ignore_index=True)
 
         # Compute overall metrics
         y_true_all = df["y_true"].astype(float).values
         y_pred_all = df["y_pred"].astype(float).values
 
-        mae_mean = df["AE"].mean()
-        mse_mean = df["SE"].mean()
+        mae_mean = df["abs_error"].mean()
+        mse_mean = df["squared_error"].mean()
         
-        mae_median = df["AE"].median()
-        mse_median = df["SE"].median()
+        mae_median = df["abs_error"].median()
+        mse_median = df["squared_error"].median()
         
         r2_overall = 1 - (
             np.sum((y_true_all - y_pred_all)**2) /
@@ -311,15 +305,17 @@ def main():
         # Summary
         df_summary = pd.DataFrame([
             {"file": "--- MEAN ---", "y_true": "", "y_pred": "", 
-            "AE": mae_mean, "SE": mse_mean, "R2": r2_overall},
+            "abs_error": mae_mean, "squared_error": mse_mean, "R2": r2_overall},
             {"file": "--- MEDIAN ---", "y_true": "", "y_pred": "", 
-            "AE": mae_median, "SE": mse_median, "R2": ""},
+            "abs_error": mae_median, "squared_error": mse_median, "R2": ""},
         ])
 
         df_final = pd.concat([df, df_summary], ignore_index=True)
 
-        os.makedirs(savedir, exist_ok=True)
-        save_path = os.path.join(savedir, filename)
+        save_dir = Path(savedir)
+        save_dir.mkdir(parents=True, exist_ok=True) 
+        save_path = save_dir / filename
+
         df_final.to_csv(save_path, index=False)
         
         print(f"[DEBUG] Saved to: {save_path}")
@@ -339,7 +335,7 @@ def main():
         best_checkpoint_path = checkpoint_callback.best_model_path
         print(f"Loading best checkpoint from: {best_checkpoint_path}")
         
-        if best_checkpoint_path and os.path.exists(best_checkpoint_path):
+        if best_checkpoint_path and Path(best_checkpoint_path).exists():
             classifier = LitConvNetRegressor.load_from_checkpoint(
                 best_checkpoint_path,
                 model=model
@@ -347,8 +343,8 @@ def main():
         else:
             print("WARNING: No checkpoint found, using current model")
 
-        results_dir = config.testing['savedir']
-        os.makedirs(results_dir, exist_ok=True)
+        results_dir = Path(config.testing['savedir'])
+        results_dir.mkdir(parents=True, exist_ok=True)
         
         # --------------------------
         # Train/val predictions

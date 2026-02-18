@@ -88,14 +88,14 @@ def split_data(df,val_split,test=''):
 
     return df_test,df_pseudotest,df_train,df_val
 
-'''
-"""
-Split dataset - overfitting test mode
-"""
-def split_data(df, val_split, test=''):
+
+def split_data_overfit(df):
+    """
+    Split dataset - overfitting test mode
+    """
     print("WARNING: Overfitting test mode - using same data for train/val/test")
     
-    df_small = df.copy() #df.head(128).copy()
+    df_small = df.copy() 
     
     df_test = df_small
     df_pseudotest = df_small
@@ -103,7 +103,7 @@ def split_data(df, val_split, test=''):
     df_val = df_small
     
     return df_test, df_pseudotest, df_train, df_val
-'''
+
 
 class MagnetogramDataSet(Dataset):
     """
