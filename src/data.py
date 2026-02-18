@@ -88,14 +88,14 @@ def split_data(df,val_split,test=''):
 
     return df_test,df_pseudotest,df_train,df_val
 
-'''
-"""
-Split dataset - modified for overfitting test mode
-"""
-def split_data(df, val_split, test=''):
+
+def split_data_overfit(df):
+    """
+    Split dataset - overfitting test mode
+    """
     print("WARNING: Overfitting test mode - using same data for train/val/test")
     
-    df_small = df.copy() #df.head(128).copy()
+    df_small = df.copy() 
     
     df_test = df_small
     df_pseudotest = df_small
@@ -103,7 +103,7 @@ def split_data(df, val_split, test=''):
     df_val = df_small
     
     return df_test, df_pseudotest, df_train, df_val
-'''
+
 
 class MagnetogramDataSet(Dataset):
     """
@@ -124,9 +124,9 @@ class MagnetogramDataSet(Dataset):
         self.label_frame = df.loc[:,label]
         self.dataset_frame = df.loc[:,'dataset']
         self.transform = transform
-        self.features = df.loc[:,feature_cols].copy() #self.features = df.loc[:,feature_cols]
+        self.features = df.loc[:,feature_cols].copy() 
         self.maxval = maxval
-        self.df = df #ADDED
+        self.df = df 
 
     def __len__(self):
         return len(self.name_frame)
@@ -158,7 +158,6 @@ class MagnetogramDataSet(Dataset):
             img = img/self.maxval
 
         label = self.label_frame.iloc[idx]
-        #features = torch.Tensor(self.features.iloc[idx]) (MODIFIED)
         features = torch.tensor(self.features.iloc[idx].to_numpy(), dtype=torch.float32)
 
 
@@ -275,12 +274,10 @@ class MagnetogramDataModule(pl.LightningDataModule):
             self.scaler = StandardScaler()
             self.scaler.fit(df_train.loc[:,self.feature_cols])
 
-            #ADDED
             df_train = df_train.copy()
             df_val = df_val.copy()
             df_pseudotest = df_pseudotest.copy()
             df_test = df_test.copy()
-            #####################
 
             df_train.loc[:,self.feature_cols] = self.scaler.transform(df_train.loc[:,self.feature_cols])
             df_val.loc[:,self.feature_cols] = self.scaler.transform(df_val.loc[:,self.feature_cols])

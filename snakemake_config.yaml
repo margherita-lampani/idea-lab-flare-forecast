@@ -3,13 +3,13 @@ email: 'margherita.lampani@edu.unige.it'
 start_date: '1996-01-01' 
 end_date: '2023-01-01' 
 wavelength: 171
-instrument_download: ['HMI','MDI']
-instrument_process: ['HMI','MDI'] 
-save_dir: 'Data'   # where to save data
+instrument_download: ['MDI','HMI'] 
+instrument_process: ['MDI','HMI']
+save_dir: 'Data-cut'   # where to save data
 cadence: '1d'      # desired cadence (much less than 1 day may require
 format: 'fits'
 dlim: 1000
-newdir: 'Data/hdf5_smoothed'
+newdir: 'Data-cut/hdf5_smoothed'
 nworkers: 4 #8 original
 
 # set up labeling parameters

@@ -50,7 +50,7 @@ class Indexer:
         self.nworkers = nworkers
 
         # header data for csv file
-        header = ['filename','fits_file','timestamp']
+        header = ['filename','fits_file','timestamp'] #add ACTIVE REGION id, if quiet sun, substituite with None
         header.extend(metadata_cols)
         header.extend(['tot_us_flux','tot_flux','datamin','datamax'])
         header = [key+'_'+data for key in header]
@@ -154,7 +154,7 @@ class Indexer:
         print(n, 'files indexed for ',self.data,year,'in',round((t1-t0)/60,2),'minutes')
         return index, error_files
     
-    def index_item(self,file,img,header,date,timestamp,new_dir):
+    def index_item(self,file,img,header,date,timestamp,new_dir): #add AR info in the name 
         """
         Obtains index data for a given fits file
 

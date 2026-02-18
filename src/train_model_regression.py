@@ -91,15 +91,14 @@ def main():
                                  weights=weights,dropoutRatio=config.model['dropout_ratio'])
     classifier = LitConvNetRegressor(model,config.training['lr'],config.training['wd'],epochs=config.training['epochs'])
 
-    # load checkpoint (MODIFIED for original see github)
-    '''
+    # load checkpoint (not needed, disabled for now)
     if wandb.run.resumed:
         classifier = load_model(run, config.meta['user']+'/'+config.meta['project']+'/model-'+config.meta['id']+':latest',
                                 model, litclass=LitConvNetRegressor)
     elif config.model['load_checkpoint']:
         classifier = load_model(run, config.model['checkpoint_location'], model, 
                                 litclass=LitConvNetRegressor, strict=False)
-    '''
+
 
     # initialize wandb logger
     wandb_logger = WandbLogger(log_model='all')
@@ -109,7 +108,7 @@ def main():
                                           save_last=True,
                                           save_weights_only=True,
                                           verbose=False)
-    #early_stop_callback = EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=15,mode='min',strict=False,check_finite=False)
+    early_stop_callback = EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=15,mode='min',strict=False,check_finite=False) #patience=15
 
     # train model
     trainer = pl.Trainer(accelerator=config.training['device'],
@@ -117,10 +116,10 @@ def main():
                          devices=config.training.get('devices', 1), #ADDED
                          deterministic=False,
                          max_epochs=config.training['epochs'],
-                         callbacks=[ModelSummary(max_depth=2),checkpoint_callback], #early_stop_callback],
+                         callbacks=[ModelSummary(max_depth=2),checkpoint_callback, early_stop_callback],
                          #gradient_clip_val=1.0, #ADDED
                          #logger=wandb_logger,
-                         logger = None,
+                         logger = True, 
                          enable_progress_bar=True, #ADDED
                          precision=16)
     
@@ -133,7 +132,7 @@ def main():
 
     print("from my laptop")
 
-    # --- Setup data
+    # Setup data
     data.prepare_data()
     data.setup('fit')
 
@@ -233,9 +232,9 @@ def main():
 
     trainer.fit(model=classifier, datamodule=data)
 
-    #TEMPORARILY DISABLED
-    ''' 
+    #TEMPORARILY DISABLED 
     # test trained model
+    '''
     if config.testing['eval']:
         # load best checkpoint
         classifier = load_model(run, config.meta['user']+'/'+config.meta['project']+'/model-'+run.id+':best_k', model,
@@ -255,8 +254,123 @@ def main():
         save_preds(preds,wandb.run.dir,'test_results.csv',config.data['regression'])
 
     wandb.finish()
-    ''' 
-    pass #ADDED
+    '''
+    # ============================================================
+    # TESTING no wandb
+    # ============================================================
+
+    def save_predictions_local(preds, savedir, filename):
+        
+        rows = []
+        for batch in preds:
+            # From predict_step: fname, y_true, y_pred
+            fnames, y_true, y_pred = batch
+
+            fnames = list(fnames)
+            y_true = y_true.detach().cpu().float().numpy().flatten()
+            y_pred = y_pred.detach().cpu().float().numpy().flatten()
+
+            # partial denormalization, results written in terms of log10(flux), see prepare_data function in src/data.py line 246
+            y_true = y_true * 6 - 8.5 
+            y_pred = y_pred * 6 - 8.5
+
+            batch_df = pd.DataFrame({
+                "file": list(fnames),
+                "y_true": y_true,
+                "y_pred": y_pred,
+                "abs_error": np.abs(y_true - y_pred),
+                "squared_error": (y_true - y_pred)**2,
+                "R2": None
+            })
+            
+            rows.append(batch_df)
+        
+        df = pd.concat(rows, ignore_index=True)
+
+        # Compute overall metrics
+        y_true_all = df["y_true"].astype(float).values
+        y_pred_all = df["y_pred"].astype(float).values
+
+        mae_mean = df["abs_error"].mean()
+        mse_mean = df["squared_error"].mean()
+        
+        mae_median = df["abs_error"].median()
+        mse_median = df["squared_error"].median()
+        
+        r2_overall = 1 - (
+            np.sum((y_true_all - y_pred_all)**2) /
+            np.sum((y_true_all - np.mean(y_true_all))**2)
+        )
+
+        # Summary
+        df_summary = pd.DataFrame([
+            {"file": "--- MEAN ---", "y_true": "", "y_pred": "", 
+            "abs_error": mae_mean, "squared_error": mse_mean, "R2": r2_overall},
+            {"file": "--- MEDIAN ---", "y_true": "", "y_pred": "", 
+            "abs_error": mae_median, "squared_error": mse_median, "R2": ""},
+        ])
+
+        df_final = pd.concat([df, df_summary], ignore_index=True)
+
+        save_dir = Path(savedir)
+        save_dir.mkdir(parents=True, exist_ok=True) 
+        save_path = save_dir / filename
+
+        df_final.to_csv(save_path, index=False)
+        
+        print(f"[DEBUG] Saved to: {save_path}")
+        print(f"\nMetrics summary for {filename}:")
+        print(f"  MAE (mean):   {mae_mean:.6f}")
+        print(f"  MAE (median): {mae_median:.6f}")
+        print(f"  MSE (mean):   {mse_mean:.6f}")
+        print(f"  R2 (overall): {r2_overall:.6f}")
+
+        return df_final
+    
+    if config.testing['eval']:
+        print("\n" + "="*60)
+        print("TESTING MODEL")
+        print("="*60 + "\n")
+
+        best_checkpoint_path = checkpoint_callback.best_model_path
+        print(f"Loading best checkpoint from: {best_checkpoint_path}")
+        
+        if best_checkpoint_path and Path(best_checkpoint_path).exists():
+            classifier = LitConvNetRegressor.load_from_checkpoint(
+                best_checkpoint_path,
+                model=model
+            )
+        else:
+            print("WARNING: No checkpoint found, using current model")
+
+        results_dir = Path(config.testing['savedir'])
+        results_dir.mkdir(parents=True, exist_ok=True)
+        
+        # --------------------------
+        # Train/val predictions
+        # --------------------------
+        print('\n------Train/val predictions------')
+        preds = trainer.predict(model=classifier, dataloaders=data.trainval_dataloader())
+        save_predictions_local(preds, results_dir, 'trainval_results.csv')
+        
+        # --------------------------
+        # Pseudotest predictions     #COMMENT TO NOT SEE PSEUDOTEST
+        # --------------------------
+        #print('\n------Pseudotest predictions------')
+        #preds = trainer.predict(model=classifier, dataloaders=data.pseudotest_dataloader())
+        #save_predictions_local(preds, results_dir, 'pseudotest_results.csv')
+        
+        # --------------------------
+        # Test predictions
+        # --------------------------
+        print('\n------Test predictions------')
+        preds = trainer.predict(model=classifier, dataloaders=data.test_dataloader())
+        save_predictions_local(preds, results_dir, 'test_results.csv')
+        
+        print("\nTesting complete! Results saved to:", results_dir)
+
+
+    pass 
 
 if __name__ == "__main__":
     main()
